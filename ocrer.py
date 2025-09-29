@@ -20,16 +20,16 @@ manager = multiprocessing.Manager()
 job_progress = manager.dict()
 progress_lock = manager.Lock()
 
-def update_progress(job_id, percent, message, process=""):
+def update_progress(job_id, percent, message, process="", status="running"):
     """Update progress and add log message for a specific job"""
-    print(f"DEBUG: Updating progress for job {job_id}: {percent}% - {message}")  # Debug logging
     with progress_lock:
         if job_id not in job_progress:
-            job_progress[job_id] = manager.dict({"percent": 0, "message": "", "logs": manager.list(), "process": ""})
+            job_progress[job_id] = manager.dict({"percent": 0, "message": "", "logs": manager.list(), "process": "", "status": "running"})
         
         job_data = job_progress[job_id]
         job_data["percent"] = percent
         job_data["message"] = message
+        job_data["status"] = status
         if process:
             job_data["process"] = f"{process} ({percent}%)"
         job_data["logs"].append(f"[{time.strftime('%H:%M:%S')}] {message}")
@@ -48,19 +48,24 @@ def get_progress(job_id):
                 "percent": job_data["percent"], 
                 "message": job_data["message"], 
                 "logs": list(job_data["logs"]), 
-                "process": job_data["process"]
+                "process": job_data["process"],
+                "status": job_data["status"]
             }
-        return {"percent": 0, "message": "Job not found", "logs": [], "process": ""}
+        return {"percent": 0, "message": "Job not found", "logs": [], "process": "", "status": "done"}
 
 def reset_progress(job_id):
     """Reset progress for a specific job"""
     with progress_lock:
-        job_progress[job_id] = manager.dict({"percent": 0, "message": "", "logs": manager.list(), "process": ""})
+        job_progress[job_id] = manager.dict({"percent": 0, "message": "", "logs": manager.list(), "process": "", "status": "running"})
 
 def cleanup_job_progress(job_id):
     """Clean up progress tracking for a completed job"""
     with progress_lock:
-        job_progress.pop(job_id, None)
+        if job_id in job_progress:
+            job_data = job_progress[job_id]
+            job_data["status"] = "done"
+            job_progress[job_id] = job_data
+        # The job will be removed from memory by a separate cleanup process if needed
 
 class GCVOCRWorker:
     def __init__(self, worker_id: int):
@@ -258,7 +263,7 @@ def pdftoppm(pdf_path: Path, ppm: str, img_dir: Path, job_id: str) -> int:
         return pages
 
     except Exception as e:
-        update_progress(job_id, 0, f"❌ Unexpected error during PDF conversion: {e}", process)
+        update_progress(job_id, 0, f"❌ Unexpected error during PDF conversion: {e}", process, status="done")
         return 0
 
 def save_results(results_queue: multiprocessing.Queue, total_images: int, out_dir: Path, process: str, job_id: str):
@@ -299,7 +304,7 @@ def run_ocr_pipeline(img_dir: Path, deva_dir: Path, num_workers: int, ppm: str, 
 
     images = sorted(img_dir.glob(f"*.{ppm}"))
     if not images:
-        update_progress(job_id, get_progress(job_id)["percent"], f"❌ No .{ppm} files found in {img_dir}", process)
+        update_progress(job_id, get_progress(job_id)["percent"], f"❌ No .{ppm} files found in {img_dir}", process, status="done")
         return
 
     update_progress(job_id, 0, f"Found {len(images)} images to process using {num_workers} workers", process)
@@ -341,7 +346,7 @@ def process_pdf(pdf_path: Path, job_id: str = None):
 
     # Check if OCR results already exist
     if deva_save_dir.exists() and any(deva_save_dir.iterdir()):
-        update_progress(job_id, 100, f"✅ OCR results already exist for {pdf_name}", "❌ OCR generation aborted")
+        update_progress(job_id, 100, f"✅ OCR results already exist for {pdf_name}", "❌ OCR generation aborted", status="done")
         return
 
     deva_save_dir.mkdir(parents=True, exist_ok=True)
@@ -350,9 +355,11 @@ def process_pdf(pdf_path: Path, job_id: str = None):
     pages = pdftoppm(pdf_path, ppm=PPM, img_dir=IMG_DIR, job_id=job_id)
     if pages <= 0:
         # Error already logged by pdftoppm; finalize progress so UI polling stops
-        update_progress(job_id, 100, "Aborted PDF to image conversion", "❌ OCR generation aborted")
-        cleanup_job_progress(job_id)
+        update_progress(job_id, 100, "Aborted PDF to image conversion", "❌ OCR generation aborted", status="done")
         return
+
+    # Reset progress for the next stage
+    update_progress(job_id, 0, "Starting OCR extraction", "Generating OCR from PNG images")
 
     # Step 2: Run OCR pipeline to get Devanagari text from job-specific directory
     job_img_dir = IMG_DIR / f"job_{job_id}"
@@ -363,7 +370,7 @@ def process_pdf(pdf_path: Path, job_id: str = None):
     job_img_dir = IMG_DIR / f"job_{job_id}"
     shutil.rmtree(job_img_dir, ignore_errors=True)
 
-    update_progress(job_id, 100, "OCR processing completed!", "Generating OCR from PNG images")
+    update_progress(job_id, 100, "OCR processing completed!", "Generating OCR from PNG images", status="done")
     cleanup_job_progress(job_id)
     return job_id
 
@@ -385,12 +392,12 @@ def convert_to_iast(pdf_path: Path, job_id: str = None):
     iast_save_dir = IAST_DIR / pdf_stem
 
     if not (deva_save_dir.exists() and any(deva_save_dir.iterdir())):
-        update_progress(job_id, 100, f"❌ No Devanagari OCR results for {pdf_stem}; please run OCR first.", proc_fail)
+        update_progress(job_id, 100, f"❌ No Devanagari OCR results for {pdf_stem}; please run OCR first.", proc_fail, status="done")
         return
 
     # Check if IAST results already exist
     if iast_save_dir.exists() and any(iast_save_dir.iterdir()):
-        update_progress(job_id, 100, f"✅ IAST results already exist for {pdf_stem}.", proc_fail)
+        update_progress(job_id, 100, f"✅ IAST results already exist for {pdf_stem}.", proc_fail, status="done")
         return
 
     iast_save_dir.mkdir(parents=True, exist_ok=True)
@@ -419,7 +426,7 @@ def convert_to_iast(pdf_path: Path, job_id: str = None):
             percent = int(((i + 1) / total_files) * 100)
             update_progress(job_id, percent, f"⚠️ No valid OCR output for {txt_file.stem}; skipping IAST conversion.", proc_good)
 
-    update_progress(job_id, 100, f"✅ Completed IAST conversion for {pdf_stem}!", proc_done)
+    update_progress(job_id, 100, f"✅ Completed IAST conversion for {pdf_stem}!", proc_done, status="done")
     cleanup_job_progress(job_id)
     return job_id
 

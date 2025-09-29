@@ -89,12 +89,19 @@
     
                 // Update logs
                 if (data.logs && data.logs.length > 0) {
+                    const logWindow = document.getElementById('log_window');
+                    const isScrolledToBottom = logWindow.scrollHeight - logWindow.clientHeight <= logWindow.scrollTop + 1;
+
                     clearLogs();
                     data.logs.forEach(log => addLog(log));
+
+                    if (isScrolledToBottom) {
+                        logWindow.scrollTop = logWindow.scrollHeight;
+                    }
                 }
     
                 // Check if processing is complete
-                if (data.percent >= 100) {
+                if (data.status === 'done') {
                     clearInterval(pollInterval);
                     document.getElementById(buttonId).disabled = false;
                 }
@@ -163,7 +170,6 @@
         const logEntry = document.createElement('div');
         logEntry.textContent = message;
         logWindow.appendChild(logEntry);
-        logWindow.scrollTop = logWindow.scrollHeight;
     }
     
     function clearLogs() {
