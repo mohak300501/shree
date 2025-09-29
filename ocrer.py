@@ -1,4 +1,4 @@
-import subprocess, time, os, shutil, multiprocessing, queue, io, dotenv, threading
+import subprocess, time, os, shutil, multiprocessing, queue, io, dotenv, threading, uuid, concurrent.futures
 from indic_transliteration.sanscript import transliterate, DEVANAGARI, IAST
 from pathlib import Path
 from google.cloud import vision
@@ -13,34 +13,39 @@ IAST_DIR = Path("OCR_iast")
 NUM_WORKERS = 8
 TIMEOUT = 60
 
-# Global variables for progress tracking and log capture
-current_progress = {"percent": 0, "message": "", "logs": [], "process": ""}
+# Job-based progress tracking system
+job_progress = {}
 progress_lock = threading.Lock()
 
-def update_progress(percent, message, process=""):
-    """Update progress and add log message"""
+def update_progress(job_id, percent, message, process=""):
+    """Update progress and add log message for a specific job"""
     with progress_lock:
-        current_progress["percent"] = percent
-        current_progress["message"] = message
+        if job_id not in job_progress:
+            job_progress[job_id] = {"percent": 0, "message": "", "logs": [], "process": ""}
+        
+        job_progress[job_id]["percent"] = percent
+        job_progress[job_id]["message"] = message
         if process:
-            current_progress["process"] = f"{process} ({percent}%)"
-        current_progress["logs"].append(f"[{time.strftime('%H:%M:%S')}] {message}")
+            job_progress[job_id]["process"] = f"{process} ({percent}%)"
+        job_progress[job_id]["logs"].append(f"[{time.strftime('%H:%M:%S')}] {message}")
         # Keep only last 100 log entries
-        if len(current_progress["logs"]) > 100:
-            current_progress["logs"] = current_progress["logs"][-100:]
+        if len(job_progress[job_id]["logs"]) > 100:
+            job_progress[job_id]["logs"] = job_progress[job_id]["logs"][-100:]
 
-def get_progress():
-    """Get current progress status"""
+def get_progress(job_id):
+    """Get current progress status for a specific job"""
     with progress_lock:
-        return current_progress.copy()
+        return job_progress.get(job_id, {"percent": 0, "message": "Job not found", "logs": [], "process": ""}).copy()
 
-def reset_progress():
-    """Reset progress for new operation"""
+def reset_progress(job_id):
+    """Reset progress for a specific job"""
     with progress_lock:
-        current_progress["percent"] = 0
-        current_progress["message"] = ""
-        current_progress["logs"] = []
-        current_progress["process"] = ""
+        job_progress[job_id] = {"percent": 0, "message": "", "logs": [], "process": ""}
+
+def cleanup_job_progress(job_id):
+    """Clean up progress tracking for a completed job"""
+    with progress_lock:
+        job_progress.pop(job_id, None)
 
 class GCVOCRWorker:
     def __init__(self, worker_id: int):
@@ -49,7 +54,7 @@ class GCVOCRWorker:
         # Create Google Vision client (uses GOOGLE_APPLICATION_CREDENTIALS env var)
         self.client = vision.ImageAnnotatorClient()
 
-    def grab_ocr(self, img_path: Path, process: str) -> str:
+    def grab_ocr(self, img_path: Path, process: str, job_id: str) -> str:
         """Upload one image and return recognised text using Google Cloud Vision."""
 
         text = ""
@@ -65,19 +70,19 @@ class GCVOCRWorker:
 
             if texts:
                 text = texts[0].description.strip()
-                update_progress(current_progress["percent"], f"Worker successfully OCRed {img_path.name}", process)
+                update_progress(job_id, get_progress(job_id)["percent"], f"Worker successfully OCRed {img_path.name}", process)
             else:
-                update_progress(current_progress["percent"], f"⚠️ Worker {self.worker_id}: No text found in {img_path.name}", process)
+                update_progress(job_id, get_progress(job_id)["percent"], f"⚠️ Worker {self.worker_id}: No text found in {img_path.name}", process)
 
             if response.error.message:
-                update_progress(current_progress["percent"], f"❌ Worker {self.worker_id}: API error - {response.error.message}", process)
+                update_progress(job_id, get_progress(job_id)["percent"], f"❌ Worker {self.worker_id}: API error - {response.error.message}", process)
 
         except Exception as e:
-            update_progress(current_progress["percent"], f"⚠️ Worker {self.worker_id}: Error processing {img_path.name}: {str(e)}", process)
+            update_progress(job_id, get_progress(job_id)["percent"], f"⚠️ Worker {self.worker_id}: Error processing {img_path.name}: {str(e)}", process)
 
         return text
 
-    def process_images(self, image_queue: multiprocessing.Queue, results_queue: multiprocessing.Queue):
+    def process_images(self, image_queue: multiprocessing.Queue, results_queue: multiprocessing.Queue, job_id: str):
         """Process images from the queue."""
         process = "Running OCR on images"
 
@@ -87,36 +92,71 @@ class GCVOCRWorker:
             except queue.Empty:
                 break
 
-            update_progress(current_progress["percent"], f"Worker {self.worker_id}: Processing {img_path.name}", process)
-            recognised = self.grab_ocr(img_path, process)
+            update_progress(job_id, get_progress(job_id)["percent"], f"Worker {self.worker_id}: Processing {img_path.name}", process)
+            recognised = self.grab_ocr(img_path, process, job_id)
 
             results_queue.put({
                 'img_path': img_path,
                 'text': recognised,
                 'worker_id': self.worker_id
             })
-            update_progress(current_progress["percent"], f"Worker {self.worker_id}: Completed {img_path.name} ({len(recognised)} chars)", process)
+            update_progress(job_id, get_progress(job_id)["percent"], f"Worker {self.worker_id}: Completed {img_path.name} ({len(recognised)} chars)", process)
 
-def pdftoppm_progress(current: int, total: int, process: str):
+def pdftoppm_progress(job_id: str, current: int, total: int, process: str):
     # Guard against divide-by-zero and overshoot
     total = max(1, total)
     current = max(0, min(current, total))
     percent = int((current / total) * 100)
-    update_progress(percent, f"Converting PDF page to PNG image: {current}/{total}", process)
+    update_progress(job_id, percent, f"Converting PDF page to PNG image: {current}/{total}", process)
 
-def pdftoppm(pdf_path: Path, ppm: str, img_dir: Path) -> int:
-    """Convert PDF to images with pdftoppm.
-    Returns total page count on success, 0 on failure. Emits UI-friendly logs/progress.
+def pdftoppm_chunk(args):
+    """Convert a chunk of PDF pages to images - designed for multiprocessing"""
+    pdf_path, ppm, chunk_dir, start_page, end_page, job_id = args
+    
+    try:
+        chunk_dir.mkdir(parents=True, exist_ok=True)
+        output_prefix = chunk_dir / "page"
+        
+        # Convert specific page range
+        cmd = [
+            "pdftoppm", f"-{ppm}", 
+            "-f", str(start_page), "-l", str(end_page),
+            str(pdf_path), str(output_prefix)
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            update_progress(job_id, get_progress(job_id)["percent"], 
+                           f"⚠️ Chunk {start_page}-{end_page} failed: {result.stderr.strip()}", 
+                           "Converting PDF to PNG images")
+            return 0
+        
+        # Count generated images
+        count = sum(1 for f in os.listdir(chunk_dir) if f.endswith(f".{ppm}"))
+        update_progress(job_id, get_progress(job_id)["percent"], 
+                       f"✅ Processed pages {start_page}-{end_page} ({count} images)", 
+                       "Converting PDF to PNG images")
+        return count
+        
+    except Exception as e:
+        update_progress(job_id, get_progress(job_id)["percent"], 
+                       f"❌ Error in chunk {start_page}-{end_page}: {str(e)}", 
+                       "Converting PDF to PNG images")
+        return 0
+
+def pdftoppm(pdf_path: Path, ppm: str, img_dir: Path, job_id: str) -> int:
+    """Multi-core PDF to images conversion with page chunking.
+    Returns total page count on success, 0 on failure.
     """
     process = "Converting PDF to PNG images"
 
     try:
-        # Ensure temp dir is fresh for each PDF
-        if img_dir.exists():
-            shutil.rmtree(img_dir)
-        img_dir.mkdir(parents=True, exist_ok=True)
-
-        output_prefix = img_dir / "page"
+        # Ensure temp dir is fresh for each PDF and job-specific
+        job_img_dir = img_dir / job_id
+        if job_img_dir.exists():
+            shutil.rmtree(job_img_dir)
+        job_img_dir.mkdir(parents=True, exist_ok=True)
 
         # Get total page count using pdfinfo
         result = subprocess.run(
@@ -132,56 +172,81 @@ def pdftoppm(pdf_path: Path, ppm: str, img_dir: Path) -> int:
                 except Exception:
                     pages = 0
                 break
+        
         if not pages:
-            update_progress(0, "Could not determine number of pages.", process)
+            update_progress(job_id, 0, "Could not determine number of pages.", process)
             return 0
 
-        # Start pdftoppm in background
-        proc = subprocess.Popen(
-            ["pdftoppm", f"-{ppm}", str(pdf_path), str(output_prefix)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True
-        )
+        update_progress(job_id, 0, f"Starting multi-core conversion of {pages} pages", process)
 
-        # Initial zero update so UI shows the phase started
-        pdftoppm_progress(0, pages, process)
+        # Calculate optimal chunk size (aim for 4-8 chunks)
+        max_workers = min(NUM_WORKERS, os.cpu_count() or 4)
+        chunk_size = max(1, pages // max_workers)
+        
+        # Create chunk arguments for parallel processing
+        chunks = []
+        for i in range(0, pages, chunk_size):
+            start_page = i + 1
+            end_page = min(i + chunk_size, pages)
+            chunk_dir = job_img_dir / f"chunk_{start_page}_{end_page}"
+            chunks.append((pdf_path, ppm, chunk_dir, start_page, end_page, job_id))
 
-        # Monitor progress
-        while proc.poll() is None:
-            try:
-                count = sum(
-                    1 for f in os.listdir(img_dir)
-                    if f.startswith(str("page")) and f.endswith(f".{ppm}")
-                )
-            except FileNotFoundError:
-                count = 0
-            pdftoppm_progress(count, pages, process)
-            time.sleep(1)
+        update_progress(job_id, 5, f"Processing {len(chunks)} chunks using {max_workers} cores", process)
 
-        # Read any stderr from pdftoppm
-        if proc.returncode != 0:
-            err = proc.stderr.read() if proc.stderr else ""
-            update_progress(0, f"pdftoppm failed with code {proc.returncode}: {err.strip()}", process)
-            return 0
+        # Process chunks in parallel
+        total_converted = 0
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(pdftoppm_chunk, chunk) for chunk in chunks]
+            
+            for i, future in enumerate(concurrent.futures.as_completed(futures), 1):
+                try:
+                    chunk_count = future.result()
+                    total_converted += chunk_count
+                    progress = int(20 + (i / len(chunks)) * 70)  # 20-90% for chunk processing
+                    update_progress(job_id, progress, 
+                                   f"Completed chunk {i}/{len(chunks)} ({total_converted}/{pages} pages)", 
+                                   process)
+                except Exception as e:
+                    update_progress(job_id, get_progress(job_id)["percent"], 
+                                   f"⚠️ Chunk {i} failed: {str(e)}", process)
 
-        # Final update once finished
-        try:
-            count = sum(
-                1 for f in os.listdir(img_dir)
-                if f.startswith(str("page")) and f.endswith(f".{ppm}")
-            )
-        except FileNotFoundError:
-            count = 0
-        pdftoppm_progress(count, pages, process)
-        update_progress(100, f"✅ Converted {pdf_path} → {ppm.upper()} images", process)
+        # Consolidate all chunk outputs into job-specific final directory
+        update_progress(job_id, 90, "Consolidating chunk outputs...", process)
+        
+        final_img_dir = img_dir / f"job_{job_id}"
+        if final_img_dir.exists():
+            shutil.rmtree(final_img_dir)
+        final_img_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Collect and rename all images to canonical format
+        all_images = []
+        for chunk_dir in job_img_dir.iterdir():
+            if chunk_dir.is_dir():
+                for img_file in chunk_dir.glob(f"*.{ppm}"):
+                    # Extract page number from filename
+                    try:
+                        page_num = int(img_file.stem.split('-')[-1])
+                        all_images.append((page_num, img_file))
+                    except (ValueError, IndexError):
+                        continue
+        
+        # Sort by page number and rename to canonical format
+        all_images.sort(key=lambda x: x[0])
+        for i, (page_num, img_file) in enumerate(all_images, 1):
+            canonical_name = f"page-{i:06d}.{ppm}"
+            shutil.move(str(img_file), str(final_img_dir / canonical_name))
+        
+        # Clean up chunk directories
+        shutil.rmtree(job_img_dir, ignore_errors=True)
+        
+        update_progress(job_id, 100, f"✅ Converted {pdf_path} → {pages} {ppm.upper()} images using {max_workers} cores", process)
         return pages
 
     except Exception as e:
-        update_progress(0, f"❌ Unexpected error during PDF conversion: {e}", process)
+        update_progress(job_id, 0, f"❌ Unexpected error during PDF conversion: {e}", process)
         return 0
 
-def save_results(results_queue: multiprocessing.Queue, total_images: int, out_dir: Path, process: str):
+def save_results(results_queue: multiprocessing.Queue, total_images: int, out_dir: Path, process: str, job_id: str):
     """Save OCR results to files (skip empty)."""
     saved_count = 0
     while saved_count < total_images:
@@ -195,18 +260,18 @@ def save_results(results_queue: multiprocessing.Queue, total_images: int, out_di
                 out_file = out_dir / (img_path.stem + ".txt")
                 out_file.write_text(text, encoding="utf-8")
                 percent = int(((saved_count + 1) / total_images) * 100)
-                update_progress(percent, f"✏️ Saved {out_file.name} (Worker {worker_id}) - {saved_count+1}/{total_images}", process)
+                update_progress(job_id, percent, f"✏️ Saved {out_file.name} (Worker {worker_id}) - {saved_count+1}/{total_images}", process)
             else:
                 percent = int(((saved_count + 1) / total_images) * 100)
-                update_progress(percent, f"⚠️ Skipped saving empty OCR for {img_path.name} (Worker {worker_id})", process)
+                update_progress(job_id, percent, f"⚠️ Skipped saving empty OCR for {img_path.name} (Worker {worker_id})", process)
 
             saved_count += 1
 
         except queue.Empty:
-            update_progress(current_progress["percent"], "⚠️ Timeout waiting for results", process)
+            update_progress(job_id, get_progress(job_id)["percent"], "⚠️ Timeout waiting for results", process)
             break
 
-def run_ocr_pipeline(img_dir: Path, deva_dir: Path, num_workers: int) -> None:
+def run_ocr_pipeline(img_dir: Path, deva_dir: Path, num_workers: int, job_id: str) -> None:
     """
     Run the OCR pipeline on all .png images in img_dir,
     save results to deva_dir.
@@ -219,10 +284,10 @@ def run_ocr_pipeline(img_dir: Path, deva_dir: Path, num_workers: int) -> None:
 
     images = sorted(img_dir.glob("*.png"))
     if not images:
-        update_progress(current_progress["percent"], f"❌ No .png files found in {img_dir}", process)
+        update_progress(job_id, get_progress(job_id)["percent"], f"❌ No .png files found in {img_dir}", process)
         return
 
-    update_progress(0, f"Found {len(images)} images to process using {num_workers} workers", process)
+    update_progress(job_id, 0, f"Found {len(images)} images to process using {num_workers} workers", process)
 
     image_queue = multiprocessing.Queue()
     results_queue = multiprocessing.Queue()
@@ -233,79 +298,89 @@ def run_ocr_pipeline(img_dir: Path, deva_dir: Path, num_workers: int) -> None:
     processes: list[multiprocessing.Process] = []
     for i in range(num_workers):
         worker = GCVOCRWorker(i + 1)
-        p = multiprocessing.Process(target=worker.process_images, args=(image_queue, results_queue))
+        p = multiprocessing.Process(target=worker.process_images, args=(image_queue, results_queue, job_id))
         processes.append(p)
         p.start()
 
-    save_results(results_queue, len(images), deva_dir, process)
+    save_results(results_queue, len(images), deva_dir, process, job_id)
 
     for p in processes:
         p.join()
 
-    update_progress(100, f"✅ Completed processing {len(images)} images!", process)
+    update_progress(job_id, 100, f"✅ Completed processing {len(images)} images!", process)
 
 # ───────────────────────────────────────────────────────────────
 
-def process_pdf(pdf_path: Path):
+def process_pdf(pdf_path: Path, job_id: str = None):
     """Run OCR on all images for a given PDF and save Devanagari results only."""
-    reset_progress()
+    if job_id is None:
+        job_id = str(uuid.uuid4())
+    
+    reset_progress(job_id)
 
     pdf_name = pdf_path.stem
-    update_progress(0, f"Processing {pdf_name}", "Generating OCR from PNG images")
+    update_progress(job_id, 0, f"Processing {pdf_name}", "Generating OCR from PNG images")
 
     # Step 0: Create save folder for this PDF
     deva_save_dir = DEVA_DIR / pdf_name
 
     # Check if OCR results already exist
     if deva_save_dir.exists() and any(deva_save_dir.iterdir()):
-        update_progress(100, f"✅ OCR results already exist for {pdf_name}", "❌ OCR generation aborted")
+        update_progress(job_id, 100, f"✅ OCR results already exist for {pdf_name}", "❌ OCR generation aborted")
         return
 
     deva_save_dir.mkdir(parents=True, exist_ok=True)
 
-    # Step 1: Convert PDF to PNG images
-    pages = pdftoppm(pdf_path, ppm='png', img_dir=IMG_DIR)
+    # Step 1: Convert PDF to PNG images  
+    pages = pdftoppm(pdf_path, ppm='png', img_dir=IMG_DIR, job_id=job_id)
     if pages <= 0:
         # Error already logged by pdftoppm; finalize progress so UI polling stops
-        update_progress(100, "Aborted PDF to image conversion", "❌ OCR generation aborted")
+        update_progress(job_id, 100, "Aborted PDF to image conversion", "❌ OCR generation aborted")
+        cleanup_job_progress(job_id)
         return
 
-    # Step 2: Run OCR pipeline to get Devanagari text
-    run_ocr_pipeline(IMG_DIR, deva_save_dir, NUM_WORKERS)
+    # Step 2: Run OCR pipeline to get Devanagari text from job-specific directory
+    job_img_dir = IMG_DIR / f"job_{job_id}"
+    run_ocr_pipeline(job_img_dir, deva_save_dir, NUM_WORKERS, job_id)
 
     # Step 3: Cleanup
-    update_progress(100, "Cleaning up temporary files...", "Generating OCR from PNG images")
-    shutil.rmtree(IMG_DIR, ignore_errors=True)
+    update_progress(job_id, 100, "Cleaning up temporary files...", "Generating OCR from PNG images")
+    job_img_dir = IMG_DIR / f"job_{job_id}"
+    shutil.rmtree(job_img_dir, ignore_errors=True)
 
-    update_progress(100, "OCR processing completed!", "Generating OCR from PNG images")
-    return
+    update_progress(job_id, 100, "OCR processing completed!", "Generating OCR from PNG images")
+    cleanup_job_progress(job_id)
+    return job_id
 
-def convert_to_iast(pdf_path: Path):
+def convert_to_iast(pdf_path: Path, job_id: str = None):
     """Convert existing Devanagari OCR results to IAST."""
+    if job_id is None:
+        job_id = str(uuid.uuid4())
+        
     proc_good = "⏩️ Converting raw OCR to IAST"
     proc_fail = "❌ IAST conversion aborted"
     proc_done = "✅ IAST conversion completed"
 
     pdf_stem = pdf_path.stem
-    reset_progress()
-    update_progress(0, f"⏩️ Converting to IAST: {pdf_stem}.", proc_good)
+    reset_progress(job_id)
+    update_progress(job_id, 0, f"⏩️ Converting to IAST: {pdf_stem}.", proc_good)
 
     # Step 0: Check if Devanagari results exist
     deva_save_dir = DEVA_DIR / pdf_stem
     iast_save_dir = IAST_DIR / pdf_stem
 
     if not (deva_save_dir.exists() and any(deva_save_dir.iterdir())):
-        update_progress(100, f"❌ No Devanagari OCR results for {pdf_stem}; please run OCR first.", proc_fail)
+        update_progress(job_id, 100, f"❌ No Devanagari OCR results for {pdf_stem}; please run OCR first.", proc_fail)
         return
 
     # Check if IAST results already exist
     if iast_save_dir.exists() and any(iast_save_dir.iterdir()):
-        update_progress(100, f"✅ IAST results already exist for {pdf_stem}.", proc_fail)
+        update_progress(job_id, 100, f"✅ IAST results already exist for {pdf_stem}.", proc_fail)
         return
 
     iast_save_dir.mkdir(parents=True, exist_ok=True)
 
-    update_progress(0, "⏩️ Reading Devanagari OCR files...", proc_good)
+    update_progress(job_id, 0, "⏩️ Reading Devanagari OCR files...", proc_good)
 
     # Step 1: Collect OCRed texts and transliterate to IAST
     txt_files = sorted(deva_save_dir.glob("*.txt"))
@@ -324,13 +399,14 @@ def convert_to_iast(pdf_path: Path):
             iast_out_path = iast_save_dir / txt_file.name
             iast_out_path.write_text("\n".join(iast_text), encoding="utf-8")
             percent = int(((i + 1) / total_files) * 100)
-            update_progress(percent, f"✏️ Converted {txt_file.name} ({i+1}/{total_files})", proc_good)
+            update_progress(job_id, percent, f"✏️ Converted {txt_file.name} ({i+1}/{total_files})", proc_good)
         else:
             percent = int(((i + 1) / total_files) * 100)
-            update_progress(percent, f"⚠️ No valid OCR output for {txt_file.stem}; skipping IAST conversion.", proc_good)
+            update_progress(job_id, percent, f"⚠️ No valid OCR output for {txt_file.stem}; skipping IAST conversion.", proc_good)
 
-    update_progress(100, f"✅ Completed IAST conversion for {pdf_stem}!", proc_done)
-    return
+    update_progress(job_id, 100, f"✅ Completed IAST conversion for {pdf_stem}!", proc_done)
+    cleanup_job_progress(job_id)
+    return job_id
 
 # ───────────────────────────── MAIN ─────────────────────────────
 

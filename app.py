@@ -15,7 +15,7 @@ from indic_transliteration.sanscript import transliterate, DEVANAGARI, ITRANS
 from datetime import datetime
 from pathlib import Path
 from ocrer import process_pdf, convert_to_iast, get_progress
-import os, dotenv, threading
+import os, dotenv, threading, uuid
 
 dotenv.load_dotenv()
 
@@ -183,26 +183,27 @@ def ocr(pdfname):
     
     try:
         pdf_path = Path(app.config["PDF_FOLDER"]) / pdfname
+        job_id = str(uuid.uuid4())
 
-        thread = threading.Thread(target=lambda: process_pdf(pdf_path))
+        thread = threading.Thread(target=lambda: process_pdf(pdf_path, job_id))
         thread.daemon = True
         thread.start()
 
-        return jsonify({"status": "started"})
+        return jsonify({"status": "started", "job_id": job_id})
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route("/ocr_progress/<path:pdfname>")
-def ocr_progress(pdfname):
+@app.route("/ocr_progress/<job_id>")
+def ocr_progress(job_id):
     if not session.get("logged_in"):
         return jsonify({"status": "error", "message": "Not authenticated"}), 401
     
     try:
-        return jsonify(get_progress())
+        return jsonify(get_progress(job_id))
             
     except Exception as e:
-        return jsonify({"status": "error", "message": f"{pdfname}:{str(e)}"}), 500
+        return jsonify({"status": "error", "message": f"{job_id}:{str(e)}"}), 500
 
 @app.route("/iast/<path:pdfname>", methods=["POST"])
 def iast(pdfname):
@@ -211,12 +212,13 @@ def iast(pdfname):
     
     try:
         pdf_path = Path(app.config["PDF_FOLDER"]) / pdfname
+        job_id = str(uuid.uuid4())
 
-        thread = threading.Thread(target=lambda: convert_to_iast(pdf_path))
+        thread = threading.Thread(target=lambda: convert_to_iast(pdf_path, job_id))
         thread.daemon = True
         thread.start()
 
-        return jsonify({"status": "started"})
+        return jsonify({"status": "started", "job_id": job_id})
 
     except Exception as e:
         return jsonify({"status": "error", "message": f"{pdfname}:{str(e)}"}), 500

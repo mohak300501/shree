@@ -5,7 +5,6 @@
 {% endblock %}
 
 {% block content %}
-<div class="container">
     <form method="POST" action="/upload" class="form" enctype="multipart/form-data">
         <h2>Upload PDF</h2>
 
@@ -44,142 +43,131 @@
         </div>
     </form>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <ul class="flash-messages">
-            {% for category, message in messages %}
-                <li class="{{ category }}">{{ message }}</li>
-            {% endfor %}
-            </ul>
-        {% endif %}
-    {% endwith %}
-</div>
-
-<script>
-function generateOCR() {
-    const selectedPdf = document.getElementById('pdf_file').value;
-    if (!selectedPdf) {
-        alert('Please select a PDF file first.');
-        return;
-    }
-    
-    // Show progress section
-    document.getElementById('progress_section').style.display = 'block';
-    document.getElementById('generate_ocr_btn').disabled = true;
-    
-    // Reset progress
-    clearLogs();
-    
-    // Start OCR process
-    fetch('/ocr/' + encodeURIComponent(selectedPdf), {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
+    <script>
+    function generateOCR() {
+        const selectedPdf = document.getElementById('pdf_file').value;
+        if (!selectedPdf) {
+            alert('Please select a PDF file first.');
+            return;
         }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'started') {
-            startProgressPolling(selectedPdf, 'generate_ocr_btn');
-        } else {
-            document.getElementById('generate_ocr_btn').disabled = false;
-        }
-    })
-    .catch(error => {
-        document.getElementById('generate_ocr_btn').disabled = false;
-    });
-}
-
-function startProgressPolling(pdfname, buttonId) {
-    const pollInterval = setInterval(() => {
-        fetch('/ocr_progress/' + encodeURIComponent(pdfname))
+        
+        // Show progress section
+        document.getElementById('progress_section').style.display = 'block';
+        document.getElementById('generate_ocr_btn').disabled = true;
+        
+        // Reset progress
+        clearLogs();
+        
+        // Start OCR process
+        fetch('/ocr/' + encodeURIComponent(selectedPdf), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
         .then(response => response.json())
         .then(data => {
-            if (data.percent !== undefined) {
-                updateProgress(data.percent, data.process);
-            }
-
-            // Update logs
-            if (data.logs && data.logs.length > 0) {
-                clearLogs();
-                data.logs.forEach(log => addLog(log));
-            }
-
-            // Check if processing is complete
-            if (data.percent >= 100) {
-                clearInterval(pollInterval);
-                document.getElementById(buttonId).disabled = false;
+            if (data.status === 'started' && data.job_id) {
+                startProgressPolling(data.job_id, 'generate_ocr_btn');
+            } else {
+                document.getElementById('generate_ocr_btn').disabled = false;
             }
         })
         .catch(error => {
-            console.error('Error polling progress:', error);
-            clearInterval(pollInterval);
-            document.getElementById(buttonId).disabled = false;
+            document.getElementById('generate_ocr_btn').disabled = false;
         });
-    }, 1000); // Poll every second
-}
-
-function convertToIAST() {
-    const selectedPdf = document.getElementById('pdf_file').value;
-    if (!selectedPdf) {
-        alert('Please select a PDF file first.');
-        return;
     }
     
-    // Show progress section
-    document.getElementById('progress_section').style.display = 'block';
-    document.getElementById('convert_iast_btn').disabled = true;
+    function startProgressPolling(jobId, buttonId) {
+        const pollInterval = setInterval(() => {
+            fetch('/ocr_progress/' + encodeURIComponent(jobId))
+            .then(response => response.json())
+            .then(data => {
+                if (data.percent !== undefined) {
+                    updateProgress(data.percent, data.process);
+                }
     
-    // Reset progress
-    clearLogs();
+                // Update logs
+                if (data.logs && data.logs.length > 0) {
+                    clearLogs();
+                    data.logs.forEach(log => addLog(log));
+                }
     
-    // Start IAST conversion process
-    fetch('/iast/' + encodeURIComponent(selectedPdf), {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
+                // Check if processing is complete
+                if (data.percent >= 100) {
+                    clearInterval(pollInterval);
+                    document.getElementById(buttonId).disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error polling progress:', error);
+                clearInterval(pollInterval);
+                document.getElementById(buttonId).disabled = false;
+            });
+        }, 1000); // Poll every second
+    }
+    
+    function convertToIAST() {
+        const selectedPdf = document.getElementById('pdf_file').value;
+        if (!selectedPdf) {
+            alert('Please select a PDF file first.');
+            return;
         }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'started') {
-            startProgressPolling(selectedPdf, 'convert_iast_btn');
-        } else {
+        
+        // Show progress section
+        document.getElementById('progress_section').style.display = 'block';
+        document.getElementById('convert_iast_btn').disabled = true;
+        
+        // Reset progress
+        clearLogs();
+        
+        // Start IAST conversion process
+        fetch('/iast/' + encodeURIComponent(selectedPdf), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'started' && data.job_id) {
+                startProgressPolling(data.job_id, 'convert_iast_btn');
+            } else {
+                document.getElementById('convert_iast_btn').disabled = false;
+            }
+        })
+        .catch(error => {
             document.getElementById('convert_iast_btn').disabled = false;
-        }
-    })
-    .catch(error => {
-        document.getElementById('convert_iast_btn').disabled = false;
-    });
-}
-
-function postOCR() {
-    const selectedPdf = document.getElementById('pdf_file').value;
-    if (!selectedPdf) {
-        alert('Please select a PDF file first.');
-        return;
+        });
     }
     
-    alert('Post-OCR functionality will be implemented later');
-}
-
-function updateProgress(percent, process = '') {
-    document.getElementById('progress_bar').style.width = percent + '%';
-    if (process) {
-        document.getElementById('process_label').textContent = process;
+    function postOCR() {
+        const selectedPdf = document.getElementById('pdf_file').value;
+        if (!selectedPdf) {
+            alert('Please select a PDF file first.');
+            return;
+        }
+        
+        alert('Post-OCR functionality will be implemented later');
     }
-}
-
-function addLog(message) {
-    const logWindow = document.getElementById('log_window');
-    const logEntry = document.createElement('div');
-    logEntry.textContent = message;
-    logWindow.appendChild(logEntry);
-    logWindow.scrollTop = logWindow.scrollHeight;
-}
-
-function clearLogs() {
-    document.getElementById('log_window').innerHTML = '';
-}
-</script>
+    
+    function updateProgress(percent, process = '') {
+        document.getElementById('progress_bar').style.width = percent + '%';
+        if (process) {
+            document.getElementById('process_label').textContent = process;
+        }
+    }
+    
+    function addLog(message) {
+        const logWindow = document.getElementById('log_window');
+        const logEntry = document.createElement('div');
+        logEntry.textContent = message;
+        logWindow.appendChild(logEntry);
+        logWindow.scrollTop = logWindow.scrollHeight;
+    }
+    
+    function clearLogs() {
+        document.getElementById('log_window').innerHTML = '';
+    }
+    </script>
 {% endblock %}
