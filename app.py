@@ -1,4 +1,3 @@
-
 """
   _________.__                          
  /   _____/|  |_________   ____   ____  
@@ -28,20 +27,26 @@ os.makedirs(PDF_FOLDER, exist_ok=True)
 app.config["PDF_FOLDER"] = PDF_FOLDER
 ALLOWED_EXTENSIONS = {"pdf"}
 
+
 def allowed_file(filename: str) -> bool:
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+    return "." in filename and filename.rsplit(
+        ".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 # ─────────────────────────── APP ROUTES ───────────────────────────
+
 
 @app.context_processor
 def inject_current_year():
     return {"current_year": datetime.now().year}
+
 
 @app.route("/")
 def index():
     if not session.get("logged_in"):
         return redirect(url_for("login"))
     return render_template("index.html")
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -57,6 +62,7 @@ def login():
             flash("Invalid password.", "error")
             return redirect(url_for("login"))
     return render_template("login.html")
+
 
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
@@ -85,15 +91,20 @@ def upload():
             return redirect(url_for("upload"))
 
     # List all PDF files
-    pdf_files = [f for f in os.listdir(app.config["PDF_FOLDER"]) if f.lower().endswith(".pdf")]
+    pdf_files = [
+        f for f in os.listdir(app.config["PDF_FOLDER"])
+        if f.lower().endswith(".pdf")
+    ]
 
     return render_template("upload.html", pdf_files=pdf_files)
+
 
 @app.route("/pdfs/<path:pdfname>")
 def serve_pdf(pdfname):
     if not session.get("logged_in"):
         return redirect(url_for("login"))
     return send_from_directory(app.config["PDF_FOLDER"], pdfname)
+
 
 @app.route("/deva/<path:pdfname>")
 def serve_deva(pdfname):
@@ -107,8 +118,7 @@ def serve_deva(pdfname):
 
     # Sort .txt files numerically if named like page1.txt, page2.txt, etc.
     txt_files = sorted(
-        [f for f in os.listdir(deva_folder) if f.lower().endswith(".txt")]
-    )
+        [f for f in os.listdir(deva_folder) if f.lower().endswith(".txt")])
 
     content = ""
     for txt_file in txt_files:
@@ -121,7 +131,8 @@ def serve_deva(pdfname):
             content += f"<p>Error reading {txt_file}: {e}</p>"
 
     return render_template("ocr_res.html", content=content)
- 
+
+
 @app.route("/iast/<path:pdfname>")
 def serve_iast(pdfname):
     if not session.get("logged_in"):
@@ -134,8 +145,7 @@ def serve_iast(pdfname):
 
     # Sort .txt files numerically if named like page1.txt, page2.txt, etc.
     txt_files = sorted(
-        [f for f in os.listdir(iast_folder) if f.lower().endswith(".txt")]
-    )
+        [f for f in os.listdir(iast_folder) if f.lower().endswith(".txt")])
 
     content = ""
     for txt_file in txt_files:
@@ -149,6 +159,7 @@ def serve_iast(pdfname):
 
     return render_template("ocr_res.html", content=content)
 
+
 @app.route("/pocr/<path:pdfname>")
 def serve_pocr(pdfname):
     if not session.get("logged_in"):
@@ -161,8 +172,7 @@ def serve_pocr(pdfname):
 
     # Sort .txt files numerically if named like page1.txt, page2.txt, etc.
     txt_files = sorted(
-        [f for f in os.listdir(pocr_folder) if f.lower().endswith(".txt")]
-    )
+        [f for f in os.listdir(pocr_folder) if f.lower().endswith(".txt")])
 
     content = ""
     for txt_file in txt_files:
@@ -176,11 +186,15 @@ def serve_pocr(pdfname):
 
     return render_template("ocr_res.html", content=content)
 
+
 @app.route("/ocr/<path:pdfname>", methods=["POST"])
 def ocr(pdfname):
     if not session.get("logged_in"):
-        return jsonify({"status": "error", "message": "Not authenticated"}), 401
-    
+        return jsonify({
+            "status": "error",
+            "message": "Not authenticated"
+        }), 401
+
     try:
         pdf_path = Path(app.config["PDF_FOLDER"]) / pdfname
         job_id = str(uuid.uuid4())
@@ -194,34 +208,50 @@ def ocr(pdfname):
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+
 @app.route("/ocr_progress/<job_id>")
 def ocr_progress(job_id):
     if not session.get("logged_in"):
-        return jsonify({"status": "error", "message": "Not authenticated"}), 401
-    
+        return jsonify({
+            "status": "error",
+            "message": "Not authenticated"
+        }), 401
+
     try:
         return jsonify(get_progress(job_id))
-            
+
     except Exception as e:
-        return jsonify({"status": "error", "message": f"{job_id}:{str(e)}"}), 500
+        return jsonify({
+            "status": "error",
+            "message": f"{job_id}:{str(e)}"
+        }), 500
+
 
 @app.route("/iast/<path:pdfname>", methods=["POST"])
 def iast(pdfname):
     if not session.get("logged_in"):
-        return jsonify({"status": "error", "message": "Not authenticated"}), 401
-    
+        return jsonify({
+            "status": "error",
+            "message": "Not authenticated"
+        }), 401
+
     try:
         pdf_path = Path(app.config["PDF_FOLDER"]) / pdfname
         job_id = str(uuid.uuid4())
 
-        thread = threading.Thread(target=lambda: convert_to_iast(pdf_path, job_id))
+        thread = threading.Thread(
+            target=lambda: convert_to_iast(pdf_path, job_id))
         thread.daemon = True
         thread.start()
 
         return jsonify({"status": "started", "job_id": job_id})
 
     except Exception as e:
-        return jsonify({"status": "error", "message": f"{pdfname}:{str(e)}"}), 500
+        return jsonify({
+            "status": "error",
+            "message": f"{pdfname}:{str(e)}"
+        }), 500
+
 
 @app.route("/viewpdf", methods=["GET", "POST"])
 def viewpdf():
@@ -229,13 +259,18 @@ def viewpdf():
         return redirect(url_for("login"))
 
     # List all PDF files
-    pdf_files = [f for f in os.listdir(app.config["PDF_FOLDER"]) if f.lower().endswith(".pdf")]
+    pdf_files = [
+        f for f in os.listdir(app.config["PDF_FOLDER"])
+        if f.lower().endswith(".pdf")
+    ]
 
     return render_template("viewpdf.html", pdf_files=pdf_files)
+
 
 @app.route("/about")
 def about():
     return render_template("about.html")
+
 
 @app.route("/logout", methods=["POST"])
 def logout():
@@ -243,6 +278,6 @@ def logout():
     flash("You have been logged out.", "success")
     return redirect(url_for("login"))
 
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
-
