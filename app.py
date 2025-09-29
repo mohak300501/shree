@@ -20,7 +20,7 @@ import os, dotenv, threading
 dotenv.load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY")
+app.secret_key = os.environ.get("SECRET_KEY", "dev_fallback_key_123456")
 
 # Make sure the pdfs directory exists
 PDF_FOLDER = os.path.join(os.getcwd(), "pdfs")
@@ -49,7 +49,7 @@ def login():
         return redirect(url_for("index"))
     if request.method == "POST":
         password = request.form["password"]
-        if password == os.environ.get("APP_PASSWORD"):
+        if password == os.environ.get("APP_PASSWORD", "admin123"):
             session["logged_in"] = True
             flash("Welcome! You are logged in.", "success")
             return redirect(url_for("index"))
