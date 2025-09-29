@@ -93,6 +93,8 @@ form button {
 
 form input[type="text"],
 form input[type="password"],
+form input[type="file"],
+form select,
 form textarea {
     width: 80%;
     padding: 10px;
@@ -124,13 +126,15 @@ form textarea {
 .radio {
     display: flex;
     justify-content: center;
+    gap: 50%;
+}
+
+.radio input[type="radio"] {
+    margin: 0;
 }
 
 .radio label {
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    vertical-align: middle;
 }
 
 /* Logout */
@@ -204,6 +208,58 @@ form textarea {
     margin-bottom: 20px;
 }
 
+.dual {
+    display: flex;
+    flex-direction: row;
+    width: 90%;
+}
+
+iframe {
+    border:1px solid #ccc;
+    display:none;
+    height: 1000px;
+    width: 100%;
+}
+
+/* Progress Section */
+#progress_section {
+    display: none;
+    width: 100%;
+    margin-top: 20px;
+}
+
+#progress_bar_container {
+    background-color: #f0f0f0;
+    border-radius: 10px;
+    padding: 3px;
+}
+
+#progress_bar {
+    height: 25px;
+    background-color: #4CAF50;
+    border-radius: 8px;
+    transition: width 0.3s;
+}
+
+#process_label {
+    text-align: center;
+    margin-top: 5px;
+    font-weight: bold;
+}
+
+#log_window {
+    height: 200px;
+    background-color: #f8f8f8;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    overflow-y: auto;
+    margin-top: 15px;
+    padding: 10px;
+    font-family: monospace;
+    font-size: 12px;
+    text-align: left;
+}
+
 /* Headings */
 h1, h2, h3 {
     color: #555;
@@ -219,16 +275,11 @@ button {
     cursor: pointer;
     font-size: 16px;
     background: linear-gradient(to top, #2874A6, #33aeff);
-    box-shadow: 3px 3px 3px rgba(0, 0, 0, 0.3);
+    box-shadow: -3px 3px 3px rgba(0, 0, 0, 0.3);
 }
 
 button:hover {
     background: #2874A6;
-}
-
-.scorer_btn {
-    width: fit-content;
-    margin: auto;
 }
 
 /* List Styles */
@@ -241,7 +292,7 @@ li {
     padding: 10px;
     margin-bottom: 5px;
     border-radius: 4px;
-    box-shadow: 3px 3px 3px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.05);
     text-align: left;
 }
 
@@ -385,9 +436,22 @@ footer img {
         display: flex;
     }
 
-    .form {
-        width: 80%;
+    .dual {
+        flex-direction: column;
     }
+
+    iframe {
+        height: 500px;
+    }
+
+    .form {
+        max-width: 80%;
+    }
+
+    .radio {
+        gap: 35%;
+    }
+
 }
 
 @media (max-width: 600px) {
@@ -397,8 +461,17 @@ footer img {
         width: 90%;
     }
 
+    .form {
+        padding: 15px;
+        width: 80%;
+    }
+
     .new_user {
         width: 90%;
+    }
+
+    .radio {
+        gap: 25%;
     }
 
     .data-table {

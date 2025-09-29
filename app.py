@@ -198,6 +198,8 @@ def ocr(pdfname):
     try:
         pdf_path = Path(app.config["PDF_FOLDER"]) / pdfname
         job_id = str(uuid.uuid4())
+        
+        print(f"DEBUG: Starting OCR job {job_id} for PDF {pdfname}")  # Debug logging
 
         thread = threading.Thread(target=lambda: process_pdf(pdf_path, job_id))
         thread.daemon = True
@@ -218,7 +220,9 @@ def ocr_progress(job_id):
         }), 401
 
     try:
-        return jsonify(get_progress(job_id))
+        progress_data = get_progress(job_id)
+        print(f"DEBUG: Progress for job {job_id}: {progress_data}")  # Debug logging
+        return jsonify(progress_data)
 
     except Exception as e:
         return jsonify({
@@ -270,6 +274,31 @@ def viewpdf():
 @app.route("/about")
 def about():
     return render_template("about.html")
+
+@app.route("/test_progress")
+def test_progress():
+    """Test endpoint to check if progress system is working"""
+    if not session.get("logged_in"):
+        return jsonify({"status": "error", "message": "Not authenticated"}), 401
+    
+    try:
+        from ocrer import update_progress, get_progress
+        test_job_id = "test-job-123"
+        
+        # Test updating progress
+        update_progress(test_job_id, 50, "Testing progress system", "Test Process")
+        
+        # Get the progress back
+        progress_data = get_progress(test_job_id)
+        
+        return jsonify({
+            "status": "success",
+            "test_job_id": test_job_id,
+            "progress_data": progress_data
+        })
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route("/logout", methods=["POST"])

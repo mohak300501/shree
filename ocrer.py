@@ -13,34 +13,48 @@ IAST_DIR = Path("OCR_iast")
 NUM_WORKERS = 8
 TIMEOUT = 60
 
-# Job-based progress tracking system
-job_progress = {}
-progress_lock = threading.Lock()
+# Job-based progress tracking system with multiprocessing support
+import multiprocessing
+manager = multiprocessing.Manager()
+job_progress = manager.dict()
+progress_lock = manager.Lock()
 
 def update_progress(job_id, percent, message, process=""):
     """Update progress and add log message for a specific job"""
+    print(f"DEBUG: Updating progress for job {job_id}: {percent}% - {message}")  # Debug logging
     with progress_lock:
         if job_id not in job_progress:
-            job_progress[job_id] = {"percent": 0, "message": "", "logs": [], "process": ""}
+            job_progress[job_id] = manager.dict({"percent": 0, "message": "", "logs": manager.list(), "process": ""})
         
-        job_progress[job_id]["percent"] = percent
-        job_progress[job_id]["message"] = message
+        job_data = job_progress[job_id]
+        job_data["percent"] = percent
+        job_data["message"] = message
         if process:
-            job_progress[job_id]["process"] = f"{process} ({percent}%)"
-        job_progress[job_id]["logs"].append(f"[{time.strftime('%H:%M:%S')}] {message}")
+            job_data["process"] = f"{process} ({percent}%)"
+        job_data["logs"].append(f"[{time.strftime('%H:%M:%S')}] {message}")
         # Keep only last 100 log entries
-        if len(job_progress[job_id]["logs"]) > 100:
-            job_progress[job_id]["logs"] = job_progress[job_id]["logs"][-100:]
+        if len(job_data["logs"]) > 100:
+            job_data["logs"] = job_data["logs"][-100:]
+        job_progress[job_id] = job_data
+        print(f"DEBUG: Job progress updated: {dict(job_data)}")  # Debug logging
 
 def get_progress(job_id):
     """Get current progress status for a specific job"""
     with progress_lock:
-        return job_progress.get(job_id, {"percent": 0, "message": "Job not found", "logs": [], "process": ""}).copy()
+        if job_id in job_progress:
+            job_data = job_progress[job_id]
+            return {
+                "percent": job_data["percent"], 
+                "message": job_data["message"], 
+                "logs": list(job_data["logs"]), 
+                "process": job_data["process"]
+            }
+        return {"percent": 0, "message": "Job not found", "logs": [], "process": ""}
 
 def reset_progress(job_id):
     """Reset progress for a specific job"""
     with progress_lock:
-        job_progress[job_id] = {"percent": 0, "message": "", "logs": [], "process": ""}
+        job_progress[job_id] = manager.dict({"percent": 0, "message": "", "logs": manager.list(), "process": ""})
 
 def cleanup_job_progress(job_id):
     """Clean up progress tracking for a completed job"""
