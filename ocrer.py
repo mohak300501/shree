@@ -12,6 +12,7 @@ DEVA_DIR = Path("OCR_deva")
 IAST_DIR = Path("OCR_iast")
 NUM_WORKERS = 8
 TIMEOUT = 60
+PPM = "png"
 
 # Job-based progress tracking system with multiprocessing support
 import multiprocessing
@@ -205,7 +206,7 @@ def pdftoppm(pdf_path: Path, ppm: str, img_dir: Path, job_id: str) -> int:
             chunk_dir = job_img_dir / f"chunk_{start_page}_{end_page}"
             chunks.append((pdf_path, ppm, chunk_dir, start_page, end_page, job_id))
 
-        update_progress(job_id, 5, f"Processing {len(chunks)} chunks using {max_workers} cores", process)
+        update_progress(job_id, 0, f"Processing {len(chunks)} chunks using {max_workers} cores", process)
 
         # Process chunks in parallel
         total_converted = 0
@@ -216,7 +217,7 @@ def pdftoppm(pdf_path: Path, ppm: str, img_dir: Path, job_id: str) -> int:
                 try:
                     chunk_count = future.result()
                     total_converted += chunk_count
-                    progress = int(20 + (i / len(chunks)) * 70)  # 20-90% for chunk processing
+                    progress = int(i / len(chunks) * 99)  # 0-99% for chunk processing
                     update_progress(job_id, progress, 
                                    f"Completed chunk {i}/{len(chunks)} ({total_converted}/{pages} pages)", 
                                    process)
@@ -225,7 +226,7 @@ def pdftoppm(pdf_path: Path, ppm: str, img_dir: Path, job_id: str) -> int:
                                    f"⚠️ Chunk {i} failed: {str(e)}", process)
 
         # Consolidate all chunk outputs into job-specific final directory
-        update_progress(job_id, 90, "Consolidating chunk outputs...", process)
+        update_progress(job_id, 99, "Consolidating chunk outputs...", process)
         
         final_img_dir = img_dir / f"job_{job_id}"
         if final_img_dir.exists():
@@ -285,9 +286,9 @@ def save_results(results_queue: multiprocessing.Queue, total_images: int, out_di
             update_progress(job_id, get_progress(job_id)["percent"], "⚠️ Timeout waiting for results", process)
             break
 
-def run_ocr_pipeline(img_dir: Path, deva_dir: Path, num_workers: int, job_id: str) -> None:
+def run_ocr_pipeline(img_dir: Path, deva_dir: Path, num_workers: int, ppm: str, job_id: str) -> None:
     """
-    Run the OCR pipeline on all .png images in img_dir,
+    Run the OCR pipeline on all .{ppm} images in img_dir,
     save results to deva_dir.
     """
     process = "Running OCR on images"
@@ -296,9 +297,9 @@ def run_ocr_pipeline(img_dir: Path, deva_dir: Path, num_workers: int, job_id: st
 
     deva_dir.mkdir(parents=True, exist_ok=True)
 
-    images = sorted(img_dir.glob("*.png"))
+    images = sorted(img_dir.glob(f"*.{ppm}"))
     if not images:
-        update_progress(job_id, get_progress(job_id)["percent"], f"❌ No .png files found in {img_dir}", process)
+        update_progress(job_id, get_progress(job_id)["percent"], f"❌ No .{ppm} files found in {img_dir}", process)
         return
 
     update_progress(job_id, 0, f"Found {len(images)} images to process using {num_workers} workers", process)
@@ -346,7 +347,7 @@ def process_pdf(pdf_path: Path, job_id: str = None):
     deva_save_dir.mkdir(parents=True, exist_ok=True)
 
     # Step 1: Convert PDF to PNG images  
-    pages = pdftoppm(pdf_path, ppm='png', img_dir=IMG_DIR, job_id=job_id)
+    pages = pdftoppm(pdf_path, ppm=PPM, img_dir=IMG_DIR, job_id=job_id)
     if pages <= 0:
         # Error already logged by pdftoppm; finalize progress so UI polling stops
         update_progress(job_id, 100, "Aborted PDF to image conversion", "❌ OCR generation aborted")
@@ -355,7 +356,7 @@ def process_pdf(pdf_path: Path, job_id: str = None):
 
     # Step 2: Run OCR pipeline to get Devanagari text from job-specific directory
     job_img_dir = IMG_DIR / f"job_{job_id}"
-    run_ocr_pipeline(job_img_dir, deva_save_dir, NUM_WORKERS, job_id)
+    run_ocr_pipeline(job_img_dir, deva_save_dir, NUM_WORKERS, PPM, job_id)
 
     # Step 3: Cleanup
     update_progress(job_id, 100, "Cleaning up temporary files...", "Generating OCR from PNG images")
