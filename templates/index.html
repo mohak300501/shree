@@ -1,58 +1,72 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>{% block title %}PDF OCR{% endblock %}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
-</head>
-<body>
-    <header>
-        <div class="header-content">
-            <div class="logotitle">
-                <div class="logo">
-                    <img src="{{ url_for('static', filename='favicon.svg') }}" alt="Logo" width="65" height="65">
+    <head>
+        <title>{% block title %}PDF OCR{% endblock %}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+        <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    </head>
+    <body>
+        <header>
+            <div class="header-content">
+                <div class="logotitle">
+                    <div class="logo">
+                        <img src="{{ url_for('static', filename='favicon.svg') }}" alt="Logo" width="65" height="65">
+                    </div>
+                    <div class="site-title">
+                        <h1>PDF OCR</h1>
+                    </div>
                 </div>
-                <div class="site-title">
-                    <h1>PDF OCR</h1>
+                <nav>
+                    {% if session.get('logged_in') %}
+                    <input type="checkbox" id="menu-toggle" class="menu-toggle">
+                    <label for="menu-toggle" class="hamburger">
+                        &#9776;
+                    </label>
+                    <ul class="nav-links">
+                        <li><a href="{{ url_for('upload') }}">Upload PDF</a></li>
+                        <li><a href="{{ url_for('viewpdf') }}">View PDFs</a></li>
+                    </ul>
+                    {% endif %}
+                </nav>
+                <div class="logout">
+                    {% if session.get('logged_in') %}
+                    <form action="{{ url_for('logout') }}" method="post">
+                        <button type="submit">Logout</button>
+                    </form>
+                    {% endif %}
                 </div>
             </div>
-            <nav>
-                {% if session.get('logged_in') %}
-                <input type="checkbox" id="menu-toggle" class="menu-toggle">
-                <label for="menu-toggle" class="hamburger">
-                    &#9776;
-                </label>
-                <ul class="nav-links">
-                    <li><a href="{{ url_for('upload') }}">Upload PDF</a></li>
-                    <li><a href="{{ url_for('viewpdf') }}">View PDFs</a></li>
+        </header>
+
+        <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flash">
+                {% for category, message in messages %}
+                    <li class="{{ category }}">
+                        {{ message }}
+                        <span id="close-btn" onclick="close_flash(this)">&times;</span>
+                    </li>
+                {% endfor %}
                 </ul>
-                {% endif %}
-            </nav>
-            <div class="logout">
-                {% if session.get('logged_in') %}
-                <form action="{{ url_for('logout') }}" method="post">
-                    <button type="submit">Logout</button>
-                </form>
-                {% endif %}
-            </div>
-        </div>
-    </header>
+            {% endif %}
+        {% endwith %}
 
-    {% block content %}
-    <div class="container">Namaste</div>
-    {% endblock %}
+        {% block content %}
+        <h1>नमस्ते 🙏!</h1>
+        {% endblock %}
 
-    <footer>
-        <p>&copy; {{ current_year }} CIKS, IITR</p>
-        <p>
-            <a href="https://github.com/mohak300501/sanskritiks" target="_blank">
-                <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="GitHubIcon" width="20" height="20">
-                GitHub
-            </a>
-            <a href="{{ url_for('about') }}">About</a>
-            <a href="http://10.57.1.96:5002" target="_blank">Swastik</a>
-        </p>
-    </footer>
-</body>
+        <footer>
+            <p>&copy; {{ current_year }} CIKS, IITR</p>
+            <p>
+                <a href="https://github.com/mohak300501/sanskritiks" target="_blank">
+                    <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="GitHubIcon" width="20" height="20">
+                    GitHub
+                </a>
+                <a href="{{ url_for('about') }}">About</a>
+                <a href="http://10.57.1.96:5002" target="_blank">Swastik</a>
+            </p>
+        </footer>
+    </body>
 </html>

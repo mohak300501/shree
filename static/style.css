@@ -93,8 +93,6 @@ form button {
 
 form input[type="text"],
 form input[type="password"],
-form input[type="file"],
-form select,
 form textarea {
     width: 80%;
     padding: 10px;
@@ -126,15 +124,13 @@ form textarea {
 .radio {
     display: flex;
     justify-content: center;
-    gap: 50%;
-}
-
-.radio input[type="radio"] {
-    margin: 0;
 }
 
 .radio label {
-    vertical-align: middle;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 /* Logout */
@@ -208,58 +204,6 @@ form textarea {
     margin-bottom: 20px;
 }
 
-.dual {
-    display: flex;
-    flex-direction: row;
-    width: 90%;
-}
-
-iframe {
-    border:1px solid #ccc;
-    display:none;
-    height: 1000px;
-    width: 100%;
-}
-
-/* Progress Section */
-#progress_section {
-    display: none;
-    width: 100%;
-    margin-top: 20px;
-}
-
-#progress_bar_container {
-    background-color: #f0f0f0;
-    border-radius: 10px;
-    padding: 3px;
-}
-
-#progress_bar {
-    height: 25px;
-    background-color: #4CAF50;
-    border-radius: 8px;
-    transition: width 0.3s;
-}
-
-#process_label {
-    text-align: center;
-    margin-top: 5px;
-    font-weight: bold;
-}
-
-#log_window {
-    height: 200px;
-    background-color: #f8f8f8;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    overflow-y: auto;
-    margin-top: 15px;
-    padding: 10px;
-    font-family: monospace;
-    font-size: 12px;
-    text-align: left;
-}
-
 /* Headings */
 h1, h2, h3 {
     color: #555;
@@ -275,11 +219,16 @@ button {
     cursor: pointer;
     font-size: 16px;
     background: linear-gradient(to top, #2874A6, #33aeff);
-    box-shadow: -3px 3px 3px rgba(0, 0, 0, 0.3);
+    box-shadow: 3px 3px 3px rgba(0, 0, 0, 0.3);
 }
 
 button:hover {
     background: #2874A6;
+}
+
+.scorer_btn {
+    width: fit-content;
+    margin: auto;
 }
 
 /* List Styles */
@@ -292,7 +241,7 @@ li {
     padding: 10px;
     margin-bottom: 5px;
     border-radius: 4px;
-    box-shadow: 0 0 5px rgba(0, 0, 0, 0.05);
+    box-shadow: 3px 3px 3px rgba(0, 0, 0, 0.3);
     text-align: left;
 }
 
@@ -306,29 +255,50 @@ a:hover {
 }
 
 /* Flash Messages */
-.flash-messages {
-    list-style: none;
-    padding: 0;
+.flash {
     margin: 20px auto;
-    max-width: 400px;
     text-align: center;
 }
 
-.flash-messages li {
-    padding: 10px;
-    margin-bottom: 10px;
-    border-radius: 4px;
+.flash .success {
+    background: #8bf163af;
+    color: black;
+}
+
+.flash .error {
+    background: #ffc9d5;
+    color: black;
+}
+
+.flash .info {
+    background: #bce5f7;
+    color: black;
+}
+
+.flash #close-btn {
+    border-radius: 50%;
+    cursor: pointer;
+    padding: 8px;
+    font-weight: bold;
+    display: inline-block;
+    height: 25px;
+    width: 25px;
     text-align: center;
 }
 
-.flash-messages .error {
-    background-color: #d9534f;
+.flash .success #close-btn:hover {
+    background: #336f24;
     color: white;
 }
 
-.flash-messages .success {
-    background-color: #8bf163af;
-    color: black;
+.flash .error #close-btn:hover {
+    background: #c9302c;
+    color: white;
+}
+
+.flash .info #close-btn:hover {
+    background: #2874A6;
+    color: white;
 }
 
 /* Data Table */
@@ -415,22 +385,9 @@ footer img {
         display: flex;
     }
 
-    .dual {
-        flex-direction: column;
-    }
-
-    iframe {
-        height: 500px;
-    }
-
     .form {
-        max-width: 80%;
+        width: 80%;
     }
-
-    .radio {
-        gap: 35%;
-    }
-
 }
 
 @media (max-width: 600px) {
@@ -440,17 +397,8 @@ footer img {
         width: 90%;
     }
 
-    .form {
-        padding: 15px;
-        width: 80%;
-    }
-
     .new_user {
         width: 90%;
-    }
-
-    .radio {
-        gap: 25%;
     }
 
     .data-table {
