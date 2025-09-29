@@ -1,0 +1,68 @@
+{% extends "index.html" %}
+
+{% block title %}
+    View PDF
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>View PDF</h2>
+    <form method="POST" action="/viewpdf" class="form">
+        <label for="pdf_file">Select PDF:</label>
+        <select id="pdf_file" name="pdf_file">
+            <option value="" disabled selected>Select a file to view</option>
+            {% for pdf in pdf_files %}
+                <option value="{{ pdf }}" {% if pdf == selected_pdf %}selected{% endif %}>
+                    {{ pdf }}
+                </option>
+            {% endfor %}
+        </select><br/>&nbsp;
+        <label for="ocr_type">Select OCR result type:</label>
+        <select id="ocr_type" name="ocr_type">
+            <option value="deva" selected>Devanagiri</option>
+            <option value="iast">IAST</option>
+            <option value="pocr">PostOCR</option>
+        </select>
+    </form>
+
+    <div class="dual">
+        <iframe id="pdfViewer"></iframe>
+        <iframe id="ocrViewer"></iframe>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const pdfdrop  = document.getElementById("pdf_file");
+    const ocrdrop  = document.getElementById("ocr_type");
+    const pdfFrame = document.getElementById("pdfViewer");
+    const ocrFrame = document.getElementById("ocrViewer");
+
+    pdfdrop.addEventListener("change", () => {
+        const pdfName = pdfdrop.value;
+        const ocrType = ocrdrop.value;
+        if (pdfName) {
+            pdfFrame.src = "/pdfs/" + pdfName;
+            pdfFrame.style.display = "block";
+
+            ocrFrame.src = `/${ocrType}/` + pdfName;
+            ocrFrame.style.display = "block";
+        } else {
+            pdfFrame.style.display = "none";
+            pdfFrame.src = "";
+
+            ocrFrame.style.display = "none";
+            ocrFrame.src = "";
+        }
+    });
+    
+    ocrdrop.addEventListener("change", () => {
+        const pdfName = pdfdrop.value;
+        const ocrType = ocrdrop.value;
+        if (pdfName) {
+            ocrFrame.src = `/${ocrType}/` + pdfName;
+        }
+    })
+});
+</script>
+{% endblock %}

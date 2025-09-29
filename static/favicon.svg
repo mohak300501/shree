@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- White circular background -->
+  <circle cx="50" cy="50" r="50" fill="white"></circle>
+
+  <!-- ॐ letter, centered -->
+  <text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" font-size="60" font-weight="bold" fill="black" font-family="sans-serif">
+    श्री
+  </text>
+</svg>

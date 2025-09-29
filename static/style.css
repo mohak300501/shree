@@ -1,0 +1,499 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: sans-serif;
+  line-height: 1.6;
+  background-color: #d1e1e1;
+  color: #333;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+header {
+    background-color: #2874A6;
+    color: white;
+    padding: 10px 0;
+    width: 100%;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.logotitle {
+    display: flex;
+}
+
+.logo {
+    margin-right: 10px;
+}
+
+.site-title h1 {
+    color: white;
+    font-size: 24px;
+}
+
+/* Navigation */
+nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+}
+
+nav ul li {
+    background: none;
+    box-shadow: none;
+    margin-left: 20px;
+}
+
+nav a {
+    color: white;
+    text-decoration: none;
+    font-size: 16px;
+}
+
+nav a:hover {
+    text-decoration: underline;
+}
+
+/* Hamburger menu */
+.hamburger {
+    display: none;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.menu-toggle {
+    display: none;
+}
+
+/* Forms */
+form label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+form button {
+    display: block;
+    width: 100%;
+}
+
+form input[type="text"],
+form input[type="password"],
+form input[type="file"],
+form select,
+form textarea {
+    width: 80%;
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    resize: vertical;
+}
+
+.form, .new_user {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #ddd;
+    border-radius: 10px;
+    background: #f4f4f4;
+    padding: 2%;
+    width: 50%;
+    margin: 20px;
+}
+
+.form button,
+.new_user button {
+    width: 80%;
+    margin-bottom: 2%;
+}
+
+.radio {
+    display: flex;
+    justify-content: center;
+    gap: 50%;
+}
+
+.radio input[type="radio"] {
+    margin: 0;
+}
+
+.radio label {
+    vertical-align: middle;
+}
+
+/* Logout */
+.logout {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+}
+
+.logout button {
+    background: #d9534f;
+    font-size: 14px;
+}
+
+.logout button:hover {
+    background: #c9302c;
+}
+
+/* Containers */
+.container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    flex: 1;
+    text-align: center;
+    margin: 20px auto;
+    background: #fff;
+    width: 85%;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    box-sizing: border-box;
+}
+
+.sc-main {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    flex: 1;
+}
+
+.sc-tr {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    gap: 5%;
+}
+
+.tile {
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+    background-color: #f4f4f4;
+    border-radius: 10px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 40%;
+    margin: 20px;
+}
+
+.tile span {
+    border: #333 solid 1px;
+    text-align: left;
+    width: 80%;
+    background-color: white;
+    display: block;
+    padding: 10px;
+    margin-bottom: 20px;
+}
+
+.dual {
+    display: flex;
+    flex-direction: row;
+    width: 90%;
+}
+
+iframe {
+    border:1px solid #ccc;
+    display:none;
+    height: 1000px;
+    width: 100%;
+}
+
+/* Progress Section */
+#progress_section {
+    display: none;
+    width: 100%;
+    margin-top: 20px;
+}
+
+#progress_bar_container {
+    background-color: #f0f0f0;
+    border-radius: 10px;
+    padding: 3px;
+}
+
+#progress_bar {
+    height: 25px;
+    background-color: #4CAF50;
+    border-radius: 8px;
+    transition: width 0.3s;
+}
+
+#process_label {
+    text-align: center;
+    margin-top: 5px;
+    font-weight: bold;
+}
+
+#log_window {
+    height: 200px;
+    background-color: #f8f8f8;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    overflow-y: auto;
+    margin-top: 15px;
+    padding: 10px;
+    font-family: monospace;
+    font-size: 12px;
+    text-align: left;
+}
+
+/* Headings */
+h1, h2, h3 {
+    color: #555;
+    text-align: center;
+}
+
+/* Button */
+button {
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    background: linear-gradient(to top, #2874A6, #33aeff);
+    box-shadow: -3px 3px 3px rgba(0, 0, 0, 0.3);
+}
+
+button:hover {
+    background: #2874A6;
+}
+
+/* List Styles */
+ul {
+    list-style: none;
+    padding: 0;
+}
+
+li {
+    padding: 10px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.05);
+    text-align: left;
+}
+
+a {
+    color: #0275d8;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Flash Messages */
+.flash-messages {
+    list-style: none;
+    padding: 0;
+    margin: 20px auto;
+    max-width: 400px;
+    text-align: center;
+}
+
+.flash-messages li {
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.flash-messages .error {
+    background-color: #d9534f;
+    color: white;
+}
+
+.flash-messages .success {
+    background-color: #8bf163af;
+    color: black;
+}
+
+/* Data Table */
+.data-table {
+    width: 80%;
+    margin: 20px auto;
+    border-collapse: collapse;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    box-sizing: border-box;
+}
+
+.data-table td {
+    padding: 12px 15px;
+    border: 1px solid #ddd;
+    text-align: left;
+    box-sizing: border-box;
+}
+
+.data-table tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.data-table tbody tr:hover {
+    background-color: #e9e9e9;
+}
+
+/* Footer */
+footer {
+    background-color: #2874A6;
+    color: white;
+    padding: 10px 0;
+    margin-top: auto;
+    z-index: 1000;
+    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+footer a {
+    color: lightgray;
+    margin: 0 10px;
+}
+
+footer img {
+    vertical-align: middle;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    nav ul {
+        flex-direction: column;
+        display: none;
+        width: 100%;
+        text-align: center;
+    }
+
+    nav ul.show {
+        display: flex;
+    }
+
+    nav ul li {
+        margin: 10px 0;
+    }
+
+    .hamburger {
+        display: block;
+        position: absolute;
+        right: 20px;
+        top: 15px;
+        color: white;
+    }
+
+    .logout {
+        position: static;
+        margin-top: 10px;
+        text-align: center;
+    }
+
+    .menu-toggle:checked+.hamburger+.nav-links {
+        display: flex;
+    }
+
+    .dual {
+        flex-direction: column;
+    }
+
+    iframe {
+        height: 500px;
+    }
+
+    .form {
+        max-width: 80%;
+    }
+
+    .radio {
+        gap: 35%;
+    }
+
+}
+
+@media (max-width: 600px) {
+    .container {
+        padding: 10px;
+        margin: 10px auto;
+        width: 90%;
+    }
+
+    .form {
+        padding: 15px;
+        width: 80%;
+    }
+
+    .new_user {
+        width: 90%;
+    }
+
+    .radio {
+        gap: 25%;
+    }
+
+    .data-table {
+        width: 90%;
+        margin: 10px 0;
+    }
+
+    .data-table thead {
+        display: none;
+    }
+
+    .data-table tbody tr {
+        margin-bottom: 15px;
+        display: block;
+        border: 1px solid #ddd;
+    }
+
+    .data-table td {
+        display: block;
+        text-align: left;
+        padding: 8px 10px;
+        border: none;
+        border-bottom: 1px solid #eee;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        word-break: break-all;
+    }
+
+    header,
+    footer {
+        padding: 10px;
+    }
+
+    footer a {
+        display: inline-block;
+        margin: 5px;
+    }
+
+    .sc-tr {
+        flex-direction: column;
+    }
+
+    .tile {
+        width: 90%;
+    }
+}

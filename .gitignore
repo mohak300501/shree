@@ -1,0 +1,9 @@
+*
+
+!.gitignore
+!app.py
+!ocrer.py
+!static
+!static/*
+!templates/
+!templates/*

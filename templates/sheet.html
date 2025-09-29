@@ -1,0 +1,35 @@
+{% extends "index.html" %}
+
+{% block title %}
+    Sheet Data
+{% endblock %}
+
+{% block content %}
+    <h2>Sheet Data</h2>
+
+    {% if sheet_data is not none %}
+        <h3>Last Row Data</h3>
+        <table class="data-table">
+            <tbody>
+                {% for key, value in sheet_data.items() %}
+                <tr>
+                    <td><b>{{ key }}</b></td>
+                    <td>{{ formatter(value) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Could not load data from sheet.</p>
+    {% endif %}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <ul class="flash-messages">
+            {% for category, message in messages %}
+                <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+{% endblock %}

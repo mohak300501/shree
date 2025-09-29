@@ -1,0 +1,14 @@
+{% extends "index.html" %}
+
+{% block title %}
+    About
+{% endblock %}
+
+{% block content %}
+    <h2>About This Project</h2>
+    <p>This project, "Sanskrit Data Stats," is developed by CIKS, IITR. It provides tools and visualizations for analyzing Sanskrit data.</p>
+    <p>Our goal is to offer insights into various aspects of the Sanskrit language through data-driven approaches.</p>
+    <p>The project is open-source and the code is available on <a href="https://github.com/mohak300501/sanskritiks" target="_blank">GitHub</a>.</p>
+
+    <p><a href="{{ url_for('sheet') }}"><button>Back to Sheet Data</button></a></p>
+{% endblock %}
