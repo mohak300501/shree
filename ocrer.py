@@ -37,7 +37,6 @@ def update_progress(job_id, percent, message, process="", status="running"):
         if len(job_data["logs"]) > 100:
             job_data["logs"] = job_data["logs"][-100:]
         job_progress[job_id] = job_data
-        print(f"DEBUG: Job progress updated: {dict(job_data)}")  # Debug logging
 
 def get_progress(job_id):
     """Get current progress status for a specific job"""
@@ -199,9 +198,8 @@ def pdftoppm(pdf_path: Path, ppm: str, img_dir: Path, job_id: str) -> int:
 
         update_progress(job_id, 0, f"Starting multi-core conversion of {pages} pages", process)
 
-        # Calculate optimal chunk size (aim for 4-8 chunks)
-        max_workers = min(NUM_WORKERS, os.cpu_count() or 4)
-        chunk_size = max(1, pages // max_workers)
+        # Calculate optimal chunk size
+        chunk_size = max(1, pages // NUM_WORKERS)
         
         # Create chunk arguments for parallel processing
         chunks = []
@@ -211,11 +209,11 @@ def pdftoppm(pdf_path: Path, ppm: str, img_dir: Path, job_id: str) -> int:
             chunk_dir = job_img_dir / f"chunk_{start_page}_{end_page}"
             chunks.append((pdf_path, ppm, chunk_dir, start_page, end_page, job_id))
 
-        update_progress(job_id, 0, f"Processing {len(chunks)} chunks using {max_workers} cores", process)
+        update_progress(job_id, 0, f"Processing {len(chunks)} chunks using {NUM_WORKERS} cores", process)
 
         # Process chunks in parallel
         total_converted = 0
-        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=NUM_WORKERS) as executor:
             futures = [executor.submit(pdftoppm_chunk, chunk) for chunk in chunks]
             
             for i, future in enumerate(concurrent.futures.as_completed(futures), 1):
@@ -253,13 +251,13 @@ def pdftoppm(pdf_path: Path, ppm: str, img_dir: Path, job_id: str) -> int:
         # Sort by page number and rename to canonical format
         all_images.sort(key=lambda x: x[0])
         for i, (page_num, img_file) in enumerate(all_images, 1):
-            canonical_name = f"page-{i:06d}.{ppm}"
+            canonical_name = f"page-{i:04d}.{ppm}"
             shutil.move(str(img_file), str(final_img_dir / canonical_name))
         
         # Clean up chunk directories
         shutil.rmtree(job_img_dir, ignore_errors=True)
         
-        update_progress(job_id, 100, f"✅ Converted {pdf_path} → {pages} {ppm.upper()} images using {max_workers} cores", process)
+        update_progress(job_id, 100, f"✅ Converted {pdf_path} → {pages} {ppm.upper()} images using {NUM_WORKERS} cores", process)
         return pages
 
     except Exception as e:
@@ -343,13 +341,12 @@ def process_pdf(pdf_path: Path, job_id: str = None):
 
     # Step 0: Create save folder for this PDF
     deva_save_dir = DEVA_DIR / pdf_name
+    deva_save_dir.mkdir(parents=True, exist_ok=True)
 
     # Check if OCR results already exist
-    if deva_save_dir.exists() and any(deva_save_dir.iterdir()):
+    if any(deva_save_dir.iterdir()):
         update_progress(job_id, 100, f"✅ OCR results already exist for {pdf_name}", "❌ OCR generation aborted", status="done")
         return
-
-    deva_save_dir.mkdir(parents=True, exist_ok=True)
 
     # Step 1: Convert PDF to PNG images  
     pages = pdftoppm(pdf_path, ppm=PPM, img_dir=IMG_DIR, job_id=job_id)
@@ -370,7 +367,7 @@ def process_pdf(pdf_path: Path, job_id: str = None):
     job_img_dir = IMG_DIR / f"job_{job_id}"
     shutil.rmtree(job_img_dir, ignore_errors=True)
 
-    update_progress(job_id, 100, "OCR processing completed!", "Generating OCR from PNG images", status="done")
+    update_progress(job_id, 100, "OCR processing completed!", "✅ OCR generation completed", status="done")
     cleanup_job_progress(job_id)
     return job_id
 

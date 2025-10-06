@@ -198,8 +198,6 @@ def ocr(pdfname):
     try:
         pdf_path = Path(app.config["PDF_FOLDER"]) / pdfname
         job_id = str(uuid.uuid4())
-        
-        print(f"DEBUG: Starting OCR job {job_id} for PDF {pdfname}")  # Debug logging
 
         thread = threading.Thread(target=lambda: process_pdf(pdf_path, job_id))
         thread.daemon = True
@@ -221,7 +219,6 @@ def ocr_progress(job_id):
 
     try:
         progress_data = get_progress(job_id)
-        print(f"DEBUG: Progress for job {job_id}: {progress_data}")  # Debug logging
         return jsonify(progress_data)
 
     except Exception as e:
